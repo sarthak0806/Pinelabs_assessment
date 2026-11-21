@@ -40,6 +40,21 @@ def test_provider_with_ui_key_is_enabled(monkeypatch):
     assert all("sk-or-test" not in m.value for m in at.markdown)   # key never rendered
 
 
+def test_audit_tab_runs_both_suites_and_shows_measured_numbers():
+    at = AppTest.from_file(str(config.ROOT / "app.py"), default_timeout=300)
+    at.run()
+    at.session_state["pending"] = "Show the monthly success rate trend"
+    at.run()
+    assert not at.exception
+    {b.label: b for b in at.button}["▶ Run quality benchmark"].click().run()
+    assert not at.exception
+    {b.label: b for b in at.button}["▶ Run attack suite"].click().run()
+    assert not at.exception
+    metrics = {m.label: m.value for m in at.metric}
+    assert metrics["Attacks contained"] == "100%" and metrics["Secret leaks"] == "0"
+    assert metrics["Answer accuracy"] == "100%" and metrics["Invalid SQL executed"] == "0"
+
+
 def test_shared_openrouter_needs_no_key_and_locks_model(monkeypatch):
     monkeypatch.setattr(config, "OPENROUTER_API_KEY", "sk-or-app-key")       # as on the Modal deployment
     monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "")

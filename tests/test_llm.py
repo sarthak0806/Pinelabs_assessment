@@ -49,6 +49,15 @@ def test_claude_response_is_cached(monkeypatch, tmp_path):
     assert len(p.client.messages.calls) == 1
 
 
+def test_daily_cap_stops_further_calls(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "LLM_DAILY_CAP", 1)
+    p = _provider(monkeypatch, tmp_path, _resp("hi"))
+    p.complete([{"role": "user", "content": "first question"}])
+    with pytest.raises(llm.LLMUnavailable):
+        p.complete([{"role": "user", "content": "second, different question"}])
+    assert len(p.client.messages.calls) == 1      # the second call never reached the API
+
+
 def test_claude_refusal_raises_unavailable(monkeypatch, tmp_path):
     p = _provider(monkeypatch, tmp_path, _resp("", stop="refusal"))
     with pytest.raises(llm.LLMUnavailable):

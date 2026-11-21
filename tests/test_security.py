@@ -71,6 +71,26 @@ def test_authorizer_blocks_role_even_if_validator_bypassed():
         get_db().execute("SELECT bank_name FROM banks", role="merchant_analyst", use_cache=False)
 
 
+def test_authorizer_blocks_schema_discovery_even_if_validator_bypassed():
+    with pytest.raises(SQLValidationError):
+        get_db().execute("SELECT name FROM sqlite_master", use_cache=False)
+
+
+def test_query_timeout_cancels_runaway_query():
+    """Engine-level timeout (validator deliberately bypassed): a 3-way cross join must be cancelled, not run to the end."""
+    from utils.db import QueryTimeout, ReadOnlyDB
+    db = ReadOnlyDB(timeout_s=0.2)
+    with pytest.raises(QueryTimeout):
+        db.execute("SELECT COUNT(*) FROM transactions a, transactions b, transactions c", use_cache=False)
+
+
+def test_deep_subquery_nesting_blocked():
+    sql = ("SELECT transaction_id FROM (SELECT transaction_id FROM (SELECT transaction_id FROM "
+           "(SELECT transaction_id FROM transactions) a) b) c")
+    v = validate_sql(sql)
+    assert not v.ok and any("nesting" in e.lower() for e in v.errors)
+
+
 def test_safe_query_executes_with_params():
     r = get_db().safe_query("SELECT COUNT(*) AS n FROM transactions WHERE payment_method = ?", ["UPI"])
     assert r.df.iloc[0, 0] > 5000

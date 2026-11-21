@@ -1,7 +1,8 @@
 """Answer assembly. Facts / hypotheses / recommendations / caveats are built DETERMINISTICALLY from
 computed results, each with an evidence tag (datasets · filters · time window · n).
 The LLM may only rewrite the executive summary, and its output is rejected if it contains any
-number that does not appear in the computed facts (hallucination guard).
+number that does not appear in the computed facts (hallucination guard) or anything unsafe:
+a secret-like token, an injection phrase, a link, markup or SQL (safety filter).
 """
 from __future__ import annotations
 
@@ -9,6 +10,7 @@ import json
 import re
 from typing import List, Optional
 
+import config
 from analytics.analysis import DIM_LABELS
 
 
@@ -238,6 +240,31 @@ def grounded(summary: str, narrative: dict) -> bool:
     return True
 
 
+_SECRET_RE = re.compile(r"sk-[\w-]{6,}|\b(?:ak|as)-[A-Za-z0-9]{10,}", re.I)
+_PHRASE_RE = re.compile(r"api[ _-]?key|system prompt|ignore (?:all |the |your )?(?:previous|prior|above) instructions", re.I)
+_LINK_OR_MARKUP_RE = re.compile(r"https?://|www\.|<\s*/?[a-z!]|```|\bselect\b[^.]{0,80}\bfrom\b", re.I)
+
+
+def leaks_secret(text: str) -> bool:
+    """True if text contains a configured API key or something shaped like one."""
+    for key in (config.OPENROUTER_API_KEY, config.ANTHROPIC_API_KEY, config.MOONSHOT_API_KEY):
+        if len(key) >= 8 and key in text:
+            return True
+    return bool(_SECRET_RE.search(text))
+
+
+def unsafe_text(text: str) -> Optional[str]:
+    """Reason an LLM-written summary must be discarded (secret, injection phrase, link/markup/SQL), else None.
+    Complements `grounded`, which only checks numbers."""
+    if leaks_secret(text):
+        return "contained a secret-like token"
+    if _PHRASE_RE.search(text):
+        return "mentioned keys or system instructions"
+    if _LINK_OR_MARKUP_RE.search(text):
+        return "contained a link, markup or SQL"
+    return None
+
+
 def llm_summary(narrative: dict, provider) -> (Optional[str], str):
     """Ask the LLM for a 3-sentence executive summary using ONLY the computed facts."""
     if provider.name == "mock":
@@ -256,6 +283,9 @@ def llm_summary(narrative: dict, provider) -> (Optional[str], str):
         return None, f"LLM summary unavailable ({str(e)[:80]})"
     if not text:
         return None, "template"
+    reason = unsafe_text(text)
+    if reason:
+        return None, f"LLM summary rejected by safety filter ({reason})"
     if not grounded(text, narrative):
         return None, "LLM summary rejected by grounding check (contained a number not in computed evidence)"
     return text, provider.name

@@ -23,7 +23,7 @@ REMOTE_DIR = "/root/app"
 PORT = 8000
 
 # Never ship secrets, the local venv, logs/caches or tests into the image.
-IGNORE = [".env", ".venv", ".venv-deploy", "logs", "**/__pycache__", "**/*.pyc", ".pytest_cache", "tests", "*.bat", ".git"]
+IGNORE = [".env", ".venv", ".venv-deploy", "logs", "docs", "**/__pycache__", "**/*.pyc", ".pytest_cache", "tests", "*.bat", ".git"]
 
 image = (
     modal.Image.debian_slim(python_version="3.11")

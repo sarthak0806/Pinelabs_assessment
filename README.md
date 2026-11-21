@@ -29,7 +29,7 @@ python -m venv .venv
 pip install -r requirements.txt
 python data/seed_data.py          # builds data/payinsight.db (seed 42) and verifies the scenario targets
 streamlit run app.py
-pytest tests/                     # 65 tests, always offline (no LLM calls)
+pytest tests/                     # 79 tests, always offline (no LLM calls)
 ```
 In VS Code, select the interpreter `payinsight-ai\.venv\Scripts\python.exe`. The global `streamlit` command lacks the project's packages.
 
@@ -109,7 +109,10 @@ flowchart LR
 
    It also checks that placeholders match the bound parameters, and adds `LIMIT 1000`.
 2. **Roles:** `merchant_analyst` cannot read `banks`, `settlements` or `bank_id`.
-3. **Read-only connection:** `mode=ro`, `PRAGMA query_only`, a sqlite3 **authorizer** that enforces SELECT-only access and the role's tables at engine level, a timeout, and parameterized execution.
+3. **Read-only connection:** `mode=ro`, `PRAGMA query_only`, a sqlite3 **authorizer** that allows only SELECT/READ and denies the role's tables and anything off the catalog (e.g. `sqlite_master`) at engine level, a 5 s timeout, and parameterized execution.
+4. **Output filter:** an LLM summary is discarded if it contains an uncomputed number, a key-like token, an injection phrase, a link, markup or SQL.
+
+How these are proven, with every metric defined, is in **[EVALUATION.md](EVALUATION.md)**.
 4. **Secrets:** read only from environment variables, `.env` or the session. Never logged, cached or uploaded.
 
 ---
@@ -151,16 +154,26 @@ flowchart LR
 ---
 
 ## Testing
-`pytest tests/` gives **65 passed**:
+`pytest tests/` gives **79 passed**. Two evaluation suites (13 known-answer questions, 13 attacks) are explained in [EVALUATION.md](EVALUATION.md) and run from the **Audit & Evaluation** tab.
 
 | File | Tests | Covers |
 |---|---|---|
 | `test_data.py` | 3 | Scenario targets, defect counts, deterministic seeding |
-| `test_security.py` | 23 | 14 malicious-SQL cases, LIMIT capping, parameter mismatch, roles, read-only connection, authorizer |
+| `test_security.py` | 26 | 14 malicious-SQL cases, LIMIT capping, parameter mismatch, roles, nesting limit, 5 s timeout, read-only connection, authorizer (denied tables and schema discovery) |
+| `test_attacks.py` | 9 | **Attack suite** against a simulated compromised LLM: 13 attacks contained, zero violations, the suite can fail, output filter |
 | `test_analysis.py` | 10 | Hand-computed Kitagawa, pure mix shift, edge cases, confidence intervals, both scenarios, data-quality and reconciliation truth |
 | `test_e2e.py` | 8 | Known-answer benchmark (13/13), no invalid SQL, latency, unsafe LLM SQL never executed, hallucinated summary rejected, query log |
-| `test_llm.py` | 7 | Claude and OpenRouter providers with stubbed clients; keys never written to disk |
-| `test_app.py` | 14 | Headless Streamlit render of every example, the key-entry flow, and no deprecation banners |
+| `test_llm.py` | 8 | Claude and OpenRouter providers with stubbed clients; keys never written to disk; daily call cap |
+| `test_app.py` | 15 | Headless Streamlit render of every example, key-entry flow, both suites from the UI, no deprecation banners |
+
+## Documentation
+| Document | What it is |
+|---|---|
+| [docs/PayInsight_Product_Overview.pdf](docs/PayInsight_Product_Overview.pdf) | The product: business problem, tech stack, architecture and flow diagrams, LLM role, data, guardrails, results (15 pages) |
+| [docs/PayInsight_Interview_QA.pdf](docs/PayInsight_Interview_QA.pdf) | Interview preparation: questions and answers on architecture, flow, LLMs, validators, metrics, deployment and trade-offs (12 pages) |
+| [EVALUATION.md](EVALUATION.md) | Guardrails and every evaluation metric, defined |
+| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | A 6-minute demo walkthrough |
+| [DEPLOY.md](DEPLOY.md) | Modal deployment and operations |
 
 ## Deployment
 See [DEPLOY.md](DEPLOY.md): Modal, a public URL, and scale-to-zero.

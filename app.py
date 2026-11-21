@@ -57,6 +57,7 @@ ss.setdefault("report", None)
 ss.setdefault("pending", None)
 ss.setdefault("question", EXAMPLES[0])
 ss.setdefault("eval", None)
+ss.setdefault("attacks", None)
 
 
 def queue(q: str):
@@ -541,20 +542,37 @@ with tab_dq:
 
 # ------------------------------------------------------------------ admin
 with tab_admin:
-    st.markdown("#### Known-answer benchmark")
-    st.caption("13 questions with ground truth computed by independent SQL. Runs in mock mode (no LLM quota).")
-    if st.button("▶ Run benchmark"):
-        from analytics.evaluation import run_eval
+    from analytics import evaluation as ev
+    ui.section_title("1 · Quality benchmark", "13 questions · ground truth from independent SQL · offline, no LLM quota")
+    if st.button("▶ Run quality benchmark"):
         bar = st.progress(0.0)
-        ss.eval = run_eval(MockProvider(), progress=bar.progress)
+        ss.eval = ev.run_eval(MockProvider(), progress=bar.progress)
     if ss.eval is not None:
-        e = ss.eval
+        q = ev.quality_metrics(ss.eval)
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Accuracy", f"{e.passed.mean():.0%}", f"{int(e.passed.sum())}/{len(e)}", delta_color="off")
-        c2.metric("Unsafe / invalid SQL executed", "0")
-        c3.metric("Grounded narratives", f"{e.grounded.mean():.0%}")
-        c4.metric("Max latency", f"{e.latency_s.max():.2f}s")
-        st.dataframe(e, width="stretch", hide_index=True)
+        c1.metric("Answer accuracy", f"{q['accuracy']:.0%}", f"{q['passed']}/{q['total']} correct", delta_color="off")
+        c2.metric("Invalid SQL executed", q["invalid_sql"], "target 0", delta_color="off")
+        c3.metric("Latency p50 / max", f"{q['latency_p50']:.2f}s / {q['latency_max']:.2f}s", "target < 10s", delta_color="off")
+        c4.metric("Summaries kept or discarded safely", f"{q['grounded_rate']:.0%}", "needs an LLM to be meaningful", delta_color="off")
+        st.dataframe(ss.eval, width="stretch", hide_index=True)
+
+    ui.section_title("2 · Security attack suite",
+                    "13 attacks against a simulated compromised LLM · prompt injection, unsafe SQL, role bypass, secret leaks")
+    if st.button("▶ Run attack suite"):
+        bar = st.progress(0.0)
+        ss.attacks = ev.run_security_eval(progress=bar.progress)
+    if ss.attacks is not None:
+        s = ev.security_metrics(ss.attacks)
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Attacks contained", f"{s['containment_rate']:.0%}", f"{s['contained']}/{s['total']}", delta_color="off")
+        c2.metric("Database changes", s["db_changes"], "target 0", delta_color="off")
+        c3.metric("Role breaches", s["role_breaches"], "target 0", delta_color="off")
+        c4.metric("Row-cap violations", s["row_cap_violations"], "target 0", delta_color="off")
+        c5.metric("Secret leaks", s["secret_leaks"], "target 0", delta_color="off")
+        st.dataframe(ss.attacks.drop(columns=["error"]), width="stretch", hide_index=True)
+    with st.expander("Metric glossary: what each number means"):
+        st.dataframe(pd.DataFrame(ev.METRIC_GLOSSARY, columns=["Metric", "Family", "What it measures", "How computed", "Target"]),
+                     width="stretch", hide_index=True)
     st.markdown("#### Audit trail")
     log = audit.read(100)
     if log:

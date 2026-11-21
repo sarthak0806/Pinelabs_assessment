@@ -19,6 +19,7 @@ from typing import Optional, Sequence
 import pandas as pd
 
 import config
+from analytics.catalog import ALLOWED_TABLES
 from analytics.security import SQLValidationError, validate_sql
 
 _ALLOWED_ACTIONS = {sqlite3.SQLITE_SELECT, sqlite3.SQLITE_READ, sqlite3.SQLITE_FUNCTION,
@@ -62,8 +63,8 @@ class ReadOnlyDB:
         def auth(action, arg1, arg2, dbname, source):
             if action not in _ALLOWED_ACTIONS:
                 return sqlite3.SQLITE_DENY
-            if action == sqlite3.SQLITE_READ and arg1 and arg1.lower() in denied:
-                return sqlite3.SQLITE_DENY
+            if action == sqlite3.SQLITE_READ and arg1 and (arg1.lower() in denied or arg1.lower() not in ALLOWED_TABLES):
+                return sqlite3.SQLITE_DENY       # role-denied tables AND anything off the catalog (e.g. sqlite_master)
             return sqlite3.SQLITE_OK
         return auth
 

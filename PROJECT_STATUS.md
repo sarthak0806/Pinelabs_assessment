@@ -26,8 +26,9 @@
 | Failure scenarios: duplicates/missing, out-of-scope access, sources disagree, mix shift, ambiguous question, unsafe query | All demonstrated in the UI and covered by tests |
 
 ## Verification
-- `pytest tests/` → **65 passed**: data 3, security 23, analysis 10, e2e 8, LLM 7, UI 14. Static check (pyflakes) is clean.
+- `pytest tests/` → **79 passed**: data 3, security 26, attacks 9, analysis 10, e2e 8, LLM 8, UI 15. Static check (pyflakes) is clean.
 - Known-answer benchmark: **13/13**; no invalid or unsafe SQL executed.
+- Attack suite (prompt injection, unsafe SQL, role bypass, secret leaks vs a simulated compromised LLM): **13/13 contained**; 0 database changes, 0 role breaches, 0 row-cap violations, 0 secret leaks. Definitions of every metric: [EVALUATION.md](EVALUATION.md).
 - Live end-to-end run on OpenRouter Nemotron ("Why did success rate fall from Sep to Oct by bank?"):
   - Nemotron interpreted the question;
   - its SQL passed validation and was executed;
