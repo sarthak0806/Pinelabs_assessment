@@ -1,0 +1,63 @@
+{
+  "duplicate_transaction_ids": 5,
+  "null_bank_id": 20,
+  "null_merchant_id": 10,
+  "orphan_merchant_id": 5,
+  "invalid_payment_method": 1,
+  "failure_reason_variants": 15,
+  "null_timestamp": 3,
+  "success_with_failure_reason": 2,
+  "merchant_category_case_variants": 2,
+  "merchant_unexpected_category": 1,
+  "affected_merchants": [
+    "M024",
+    "M027",
+    "M007"
+  ],
+  "synthetic": true,
+  "seed": 42,
+  "row_counts": {
+    "banks": 10,
+    "merchants": 60,
+    "transactions": 12122,
+    "settlements": 10990
+  },
+  "monthly_truth_clean": {
+    "2026-05": {
+      "total": 1900,
+      "success": 1753,
+      "success_rate": 0.9226
+    },
+    "2026-06": {
+      "total": 1950,
+      "success": 1801,
+      "success_rate": 0.9236
+    },
+    "2026-07": {
+      "total": 2000,
+      "success": 1857,
+      "success_rate": 0.9285
+    },
+    "2026-08": {
+      "total": 2100,
+      "success": 1887,
+      "success_rate": 0.8986
+    },
+    "2026-09": {
+      "total": 2167,
+      "success": 2011,
+      "success_rate": 0.928
+    },
+    "2026-10": {
+      "total": 2000,
+      "success": 1699,
+      "success_rate": 0.8495
+    }
+  },
+  "settlement_truth": {
+    "oct_success_missing_settlement": 30,
+    "oct_success_pending": 20,
+    "oct_failed_but_settled": 12,
+    "other_months_pending_lag": 18
+  }
+}
